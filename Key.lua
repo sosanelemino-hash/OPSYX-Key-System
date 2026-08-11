@@ -44,7 +44,7 @@ local Config = {
 
     -- [7] Hub Information & UI Text
     HubName         = "OPSYX HUB", -- The main title shown at the top of the GUI
-    HubDescription  = "OPSYX Get Key" -- The text shown below the title
+    HubDescription  = "" -- The text shown below the title
 }
 
 -------------------------------------------------------------------------------
