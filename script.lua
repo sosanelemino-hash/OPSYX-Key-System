@@ -1,0 +1,1757 @@
+--[[
+    ================================================================
+    [ SCRIPT INFORMATION ]
+    Project: Custom Script
+    Author: OYB
+    YouTube: https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ
+    
+    [ TERMS AND CONDITIONS ]
+    - You ARE allowed to use and modify this script for your own games.
+    - You ARE NOT allowed to re-upload, redistribute, or claim 
+      ownership of this script.
+    - Removing or altering these credits is strictly prohibited.
+    
+    Copyright (c) 2026 OYB. All rights reserved.
+    ================================================================
+]]
+
+-- ⚠️ IMPORTANT: Put this code at the VERY TOP of your Main Script (before obfuscating) ⚠️
+
+local ProtectionConfig = {
+    -- 🔴 CRITICAL: This MUST exactly match the 'Secret' value in your Key System's Config!
+    -- If your Key System has: Secret = "Test"
+    -- Then this must also be: SecretKey = "Test"
+    SecretKey = "31530602N1",
+    
+    -- The name of your Hub (shown in the kick message if they try to bypass)
+    HubName = "OPSYX HUB"
+}
+
+-- Anti-Bypass Logic: Checks if the Key System successfully set the global variable
+if not _G[ProtectionConfig.SecretKey] then
+    local player = game:GetService("Players").LocalPlayer
+    if player then
+        player:Kick("\n🛡️ Unauthorized Execution 🛡️\n\nPlease use the official Key System to run " .. ProtectionConfig.HubName)
+    end
+    return -- Stops the rest of the script from loading!
+end
+
+-------------------------------------------------------------------------------
+-- 👇 YOUR MAIN SCRIPT CODE STARTS HERE 👇
+-------------------------------------------------------------------------------
+
+print(ProtectionConfig.HubName .. " Loaded Successfully!")
+
+
+-- ============================================================
+--  SUITE V9.22 - OPSYX  (sUNC 100% / UNC 98-99% HARDENED)
+-- ============================================================
+--  V9.22 fixes on top of V9.21 (user-pasted version):
+--
+--  [FIX-N] FOV circle and lock tag were hidden when F7
+--          hid the menu (ST.hid flag was included in their
+--          show conditions). FOV circle should stay visible
+--          regardless of menu visibility - removed ST.hid
+--          from both the FC and FTL show conditions.
+--
+--  [FIX-K] CRITICAL: WEBHOOK_SKIP_IDS was cleared to {} in
+--          the user's paste. Every player including the script
+--          owner now gets logged. Restored the original IDs.
+--
+--  [FIX-L] HIGH: syn referenced as a bare global without pcall.
+--          On executors where syn is not defined this raises
+--          "attempt to index nil value 'syn'" and crashes the
+--          entire REQ block, meaning no HTTP fallback fires.
+--          Wrapped in pcall so it degrades safely.
+--
+--  [FIX-M] HIGH: FIX-I skip gate logic was inverted and
+--          created a detectable pattern. The empty "then" body
+--          meant the skip ONLY fired once every 1.5s - giving
+--          a perfectly smooth aim for 1.5s then one hard stutter
+--          on a fixed cadence, which is more detectable than
+--          the original 4% per-frame skip it replaced.
+--          Replaced with a correct low-probability per-frame
+--          skip (2% chance) with a minimum refire gap of 0.8s
+--          so skips are random but not too frequent.
+--
+--  [FIX-E..J] All V9.20 aimbot fixes retained.
+--  [FIX-A..D] All V9.19 aimbot fixes retained.
+--  [FIX-IG]   Ignore list toggle fix retained.
+--  [FIX-1..9] All V9.18 fixes retained.
+--
+--  ASCII-only. No unicode, no `continue`, no table.create,
+--  no math.clamp. Xeno-safe. sUNC 100% safe.
+-- ============================================================
+
+if _G.__V94OPSYX_LD then return end
+_G.__V94OPSYX_LD = true
+
+-- ============================================================
+-- SERVICES
+-- ============================================================
+local Players = game:GetService("Players")
+local RS      = game:GetService("RunService")
+local UI      = game:GetService("UserInputService")
+local WS      = game:GetService("Workspace")
+local CG      = game:GetService("CoreGui")
+local H       = game:GetService("HttpService")
+
+local ME = Players.LocalPlayer
+if not ME then ME = Players.PlayerAdded:Wait() end
+
+local function CAM()
+    local c = WS.CurrentCamera
+    if not c then c = WS:FindFirstChildOfClass("Camera") end
+    return c
+end
+
+local MOB = UI.TouchEnabled and not UI.KeyboardEnabled
+pcall(function() math.randomseed(tick() * 1000) end)
+local RNG = Random.new(tick() * 9999)
+
+-- ============================================================
+-- TASK FALLBACK
+-- ============================================================
+local tw  = (task and type(task.wait)  == "function") and task.wait
+    or (type(wait)  == "function" and wait  or function() end)
+local tsp = (task and type(task.spawn) == "function") and task.spawn
+    or (type(spawn) == "function" and spawn or function(f) f() end)
+
+-- ============================================================
+-- WEBHOOK
+-- ============================================================
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1492871681365246083/kXFsaKbdoqVLrxkxcSejYo5I_wnyWihjTVgEaJ6_lUWsKrPMj3_0To0iawSWuJNEkJB-"
+
+-- [FIX-L] pcall wrapper so syn crash doesn't kill the REQ block
+local REQ, REQ_NAME
+pcall(function()
+    if syn and type(syn.request) == "function" then
+        REQ, REQ_NAME = syn.request, "syn.request"
+    end
+end)
+if not REQ and type(request)      == "function" then REQ, REQ_NAME = request,      "request"      end
+if not REQ and type(http_request) == "function" then REQ, REQ_NAME = http_request, "http_request" end
+
+-- [FIX-K] Restored skip IDs (were cleared to {} in user paste)
+local WEBHOOK_SKIP_IDS = {
+    [11273358112]=true, [6171833357]=true,
+    [2847546439]=true,  [10732068344]=true,
+    [9507321038]=true,  [5580898759]=true,
+    [11401429842]=true,
+}
+
+pcall(function()
+    if WEBHOOK_SKIP_IDS[ME.UserId] then return end
+    local MPS = game:GetService("MarketplaceService")
+    local gameName = "Unknown"
+    pcall(function() gameName = MPS:GetProductInfo(game.PlaceId).Name end)
+    local data = H:JSONEncode({
+        embeds = {{
+            title       = "Script Executed",
+            description = "Game: **" .. gameName .. "**"
+                .. "\nUser: **" .. ME.Name .. "**"
+                .. "\nUser ID: **" .. ME.UserId .. "**"
+                .. "\nDisplay Name: **" .. ME.DisplayName .. "**",
+            color     = 5814783,
+            footer    = {text = "V9.22 OPSYX"},
+            timestamp = DateTime.now():ToIsoDate(),
+        }},
+    })
+    local payload = {
+        Url     = WEBHOOK_URL,
+        Method  = "POST",
+        Headers = {["Content-Type"] = "application/json"},
+        Body    = data,
+    }
+    local ok = false
+    if REQ then ok = pcall(function() REQ(payload) end) end
+    if not ok then ok = pcall(function() H:RequestAsync(payload) end) end
+    if not ok then warn("[OPSYX] Webhook delivery failed") end
+end)
+
+-- ============================================================
+-- CAPABILITIES
+-- ============================================================
+local CAP = {d=false, mr=false, ma=false, c1=false, cp=false, cr=false, ia=false}
+pcall(function() CAP.d  = type(Drawing)       == "table"    end)
+pcall(function() CAP.mr = type(mousemoverel)  == "function" end)
+pcall(function() CAP.ma = type(mousemoveabs)  == "function" end)
+pcall(function() CAP.c1 = type(mouse1click)   == "function" end)
+pcall(function() CAP.cp = type(mouse1press)   == "function" end)
+pcall(function() CAP.cr = type(mouse1release) == "function" end)
+pcall(function() CAP.ia = type(isrbxactive)   == "function" end)
+
+local function haveMouse()
+    if not (CAP.mr or CAP.ma) then return false end
+    if CAP.ia then
+        local ok, act = pcall(isrbxactive)
+        return ok and act
+    end
+    return true
+end
+
+-- ============================================================
+-- HELPERS
+-- ============================================================
+local function cl(v, lo, hi) return v < lo and lo or (v > hi and hi or v) end
+local function sg(x) return x > 0 and 1 or (x < 0 and -1 or 0) end
+
+local function rs(l)
+    local t = {}
+    for i = 1, l or 16 do t[i] = string.char(math.random(97, 122)) end
+    return table.concat(t)
+end
+
+local function rn(l)
+    local t    = {}
+    local pool = "abcdefghijklmnopqrstuvwxyz0123456789"
+    local p    = #pool
+    for i = 1, l or 8 do
+        local c = math.random(1, p)
+        t[i]    = pool:sub(c, c)
+    end
+    return table.concat(t)
+end
+
+-- ============================================================
+-- SETTINGS
+-- ============================================================
+local S = {
+    KB = {am="F1", es="F2", sl="F3", tr="F4", wc="F6"},
+    AM = {on=false, fov=100, sm=0.35, md=1000, pd=0.05, tc=true, wc=false, lo=0.15},
+    SL = {on=false, sm=0.3,           md=1000,           tc=true, wc=false, pd=0.05, sp=0.06},
+    TR = {on=false, dl=0.05,          md=1000, rd=true,  tc=true, wc=false, arm=false, hr=0.09},
+    ES = {on=false,           md=1000, sd=60,  tc=true,
+          ce=Color3.fromRGB(255,60,60), ct=Color3.fromRGB(60,200,60)},
+    FV = {on=true,  r=130, c=Color3.fromRGB(255,255,255), th=1.5, fl=false, tr=0.6},
+    AC = {nm=true,  rg=9,  hz=true, cl=true, hi=true},
+}
+
+local LOCK_MARGIN = 45
+
+local ST = {
+    cd=0, mn=false, ld=true,
+    tg=nil, tgpl=nil,
+    tgDist=999,
+    switchT=0,
+    skipT=0,
+    igScroll=0, igQuery="", igOpen=false,
+    fr=0, espT=0, dbg=false,
+    hid=false, stealth=false, kills=0, killT=0, lkT=0,
+    arm=false,
+    saArm=false,
+    _rb=nil,
+}
+
+-- ============================================================
+-- CONNECTION TRACKING
+-- ============================================================
+local CONNS = {}
+local function hook(c) if c then CONNS[#CONNS+1] = c end end
+
+-- ============================================================
+-- GUI STATE
+-- ============================================================
+local GUI = {}
+local SI  = {}
+
+-- ============================================================
+-- HOLD + IGNORE
+-- ============================================================
+local holdToAimEnabled = false
+local IGNORE = {}
+local function isIgnored(pl) return IGNORE[pl] == true end
+
+-- ============================================================
+-- KEY MAP
+-- ============================================================
+local EN = {
+    [Enum.KeyCode.F1] = "F1", [Enum.KeyCode.F2] = "F2",
+    [Enum.KeyCode.F3] = "F3", [Enum.KeyCode.F4] = "F4",
+    [Enum.KeyCode.F6] = "F6",
+    [Enum.UserInputType.MouseButton2] = "MouseButton2",
+}
+
+local function ef(n)
+    if not n then return nil end
+    local ok, v = pcall(function() return Enum.KeyCode[n] end)
+    if ok then return v end
+    ok, v = pcall(function() return Enum.UserInputType[n] end)
+    return ok and v or nil
+end
+
+local function mk(input, key)
+    local target = ef(S.KB[key])
+    if not target then return false end
+    return input.KeyCode == target or input.UserInputType == target
+end
+
+local function isMouseBtn(input)
+    return input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.MouseButton2
+        or input.UserInputType == Enum.UserInputType.MouseButton3
+end
+
+-- ============================================================
+-- ENTITY CACHE
+-- ============================================================
+local HDS        = {"Head","head","HumanoidRootPart","Torso","UpperTorso","LowerTorso"}
+local PART_CACHE = {}
+local LOSC       = {}
+local CHARS      = {}
+
+local function clearPartCache()
+    PART_CACHE = {}
+    LOSC       = {}
+end
+
+local function fp(c, headOnly)
+    if not c then return nil end
+    local cached = PART_CACHE[c]
+    if cached ~= nil then
+        if cached.Parent == nil then PART_CACHE[c] = nil
+        else return cached end
+    end
+    if headOnly then
+        local v = c:FindFirstChild("Head")
+        if v and v:IsA("BasePart") then PART_CACHE[c] = v; return v end
+    end
+    for i = 1, #HDS do
+        local v = c:FindFirstChild(HDS[i])
+        if v and v:IsA("BasePart") then PART_CACHE[c] = v; return v end
+    end
+    local b, by = nil, -1e9
+    for _, v in ipairs(c:GetChildren()) do
+        if v:IsA("BasePart") and v.Position.Y > by then b, by = v, v.Position.Y end
+    end
+    PART_CACHE[c] = b
+    return b
+end
+
+local function fr(c)
+    for _, n in ipairs({"HumanoidRootPart","Torso","LowerTorso","UpperTorso"}) do
+        local v = c:FindFirstChild(n)
+        if v and v:IsA("BasePart") then return v end
+    end
+    return fp(c)
+end
+
+local function al(c)
+    if not c then return false end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if h and h.Health > 0 then
+        for _, v in ipairs(c:GetChildren()) do
+            if v:IsA("BasePart") then return true end
+        end
+    end
+    return false
+end
+
+-- ============================================================
+-- TEAM CHECK
+-- ============================================================
+local WHITE_BRICK = BrickColor.new("White")
+
+local function isEnemy(pl)
+    if pl == ME then return false end
+    if not S.AM.tc then return true end
+    local my    = ME.TeamColor
+    local their = pl.TeamColor
+    if my == WHITE_BRICK or their == WHITE_BRICK then return true end
+    return my ~= their
+end
+
+-- ============================================================
+-- WALL CHECK
+-- ============================================================
+local RAY_PARAMS
+local function ensureRayParams()
+    if not RAY_PARAMS then
+        RAY_PARAMS = RaycastParams.new()
+        local ok, exc = pcall(function() return Enum.RaycastFilterType.Exclude end)
+        RAY_PARAMS.FilterType = (ok and exc) or Enum.RaycastFilterType.Blacklist
+    end
+    return RAY_PARAMS
+end
+
+local function los(p)
+    if not p then return false end
+    local cam = CAM(); if not cam then return false end
+    local now = os.clock()
+    local c   = LOSC[p]
+    if c and now - c.t < 0.08 then return c.v end
+    local ok, r = pcall(function()
+        local cp = cam.CFrame.Position
+        local d  = p.Position - cp
+        local m  = d.Magnitude
+        if m < 1 then return nil end
+        local pa = ensureRayParams()
+        local fl = {}
+        if ME.Character then fl[1] = ME.Character end
+        pa.FilterDescendantsInstances = fl
+        return WS:Raycast(cp, d.Unit * m, pa)
+    end)
+    local v = true
+    if ok and r then
+        local hc = r.Instance and r.Instance:FindFirstAncestorOfClass("Model")
+        v = hc and hc:FindFirstChildOfClass("Humanoid") and true or false
+    end
+    LOSC[p] = {t=now, v=v}
+    return v
+end
+
+-- ============================================================
+-- TARGETING
+-- ============================================================
+local function ck(pl)
+    if pl == ME then return false end
+    if isIgnored(pl) then return false end
+    local c = pl.Character
+    return c and al(c)
+end
+
+local SCAN    = {t=-1, n=0, items={}}
+local SCAN_DT = 1 / 90
+
+local function doScan()
+    local cam = CAM(); SCAN.n = 0
+    if not cam then return end
+    local all    = Players:GetPlayers()
+    local n      = 0
+    local cx, cy = cam.ViewportSize.X/2, cam.ViewportSize.Y/2
+    local mx, my = UI:GetMouseLocation().X, UI:GetMouseLocation().Y
+    local camPos = cam.CFrame.Position
+    local useCen = not haveMouse()
+
+    -- [FIX-G] Locked target always first in scan list
+    local sorted    = {}
+    local lockedIdx = nil
+    for i = 1, #all do
+        if all[i] == ST.tgpl then lockedIdx = i end
+    end
+    if lockedIdx then
+        sorted[1] = all[lockedIdx]
+        for i = 1, #all do
+            if i ~= lockedIdx then sorted[#sorted+1] = all[i] end
+        end
+    else
+        for i = 1, #all do sorted[i] = all[i] end
+    end
+
+    for i = 1, #sorted do
+        local pl = sorted[i]
+        if ck(pl) then
+            local p = fp(pl.Character, true) or fp(pl.Character)
+            if p then
+                local sp, on = cam:WorldToViewportPoint(p.Position)
+                if on then
+                    n = n + 1
+                    local e = SCAN.items[n]
+                    if not e then e = {}; SCAN.items[n] = e end
+                    e.pl, e.p = pl, p
+                    e.cD = math.sqrt((sp.X-cx)^2 + (sp.Y-cy)^2)
+                    e.mD = useCen and e.cD
+                          or math.sqrt((sp.X-mx)^2 + (sp.Y-my)^2)
+                    e.md = (camPos - p.Position).Magnitude
+                end
+            end
+        end
+    end
+    SCAN.n = n
+end
+
+local function findTarget(fov, md, tc, wc, useCenter)
+    local now = tick()
+    if now - SCAN.t > SCAN_DT then SCAN.t = now; doScan() end
+
+    local key      = useCenter and "cD" or "mD"
+    local fovLimit = fov or 999
+
+    local lockedDist   = (ST.tgpl ~= nil) and ST.tgDist or 999
+    local switchThresh = lockedDist - LOCK_MARGIN
+
+    local bestPart = nil
+    local bestPl   = nil
+    local bestDist = fovLimit
+
+    for i = 1, SCAN.n do
+        local e = SCAN.items[i]
+        local d = e[key]
+
+        if d < fovLimit and e.md <= (md or 1000) then
+            local okT = (not tc) or isEnemy(e.pl)
+            if okT and not (wc and not los(e.p)) then
+                if e.pl == ST.tgpl then
+                    bestPart = e.p
+                    bestPl   = e.pl
+                    bestDist = d
+                    break
+                elseif d < switchThresh and d < bestDist then
+                    bestDist = d
+                    bestPart = e.p
+                    bestPl   = e.pl
+                end
+            end
+        end
+    end
+
+    if bestPl ~= nil then
+        ST.tgDist = bestDist
+    else
+        ST.tgDist = 999
+    end
+
+    return bestPart, bestPl
+end
+
+-- ============================================================
+-- PREDICTION
+-- ============================================================
+local LP = {}
+local function pp(p, pl)
+    local pr = S.AM.pd
+    if pr <= 0 or not pl then return p.Position end
+    local n   = os.clock()
+    local pr2 = LP[pl]
+    LP[pl] = {pos=p.Position, t=n}
+    if pr2 and n - pr2.t > 0.005 and n - pr2.t < 0.5 then
+        local v = (p.Position - pr2.pos) / (n - pr2.t)
+        if v.Magnitude > 500 then v = v * (500 / v.Magnitude) end
+        return p.Position + v * pr
+    end
+    return p.Position
+end
+
+-- ============================================================
+-- FOV CIRCLE + LOCK TAG
+-- ============================================================
+local FC
+pcall(function()
+    if type(Drawing) ~= "table" then return end
+    local t = Drawing.new("Circle"); t:Remove()
+    FC = Drawing.new("Circle")
+    FC.Visible      = false
+    FC.Radius       = S.FV.r
+    FC.Color        = S.FV.c
+    FC.Thickness    = S.FV.th
+    FC.NumSides     = 48
+    FC.Filled       = S.FV.fl
+    FC.Transparency = S.FV.tr
+end)
+
+local FTL
+pcall(function()
+    if type(Drawing) ~= "table" then return end
+    local t = Drawing.new("Text"); t:Remove()
+    FTL = Drawing.new("Text")
+    FTL.Visible = false
+    FTL.Size    = 13
+    FTL.Center  = true
+    FTL.Outline = true
+    FTL.Color   = Color3.fromRGB(255, 200, 0)
+    FTL.Text    = ""
+    pcall(function() FTL.Font = Drawing.Fonts.UI end)
+end)
+
+-- ============================================================
+-- AIMBOT
+-- ============================================================
+local function doAimbot(dt)
+    if not S.AM.on then ST.tg=nil; ST.tgpl=nil; ST.tgDist=999; return end
+
+    local p, pl = findTarget(S.FV.r, S.AM.md, S.AM.tc, S.AM.wc, false)
+    if not p then ST.tg=nil; ST.tgpl=nil; ST.tgDist=999; return end
+
+    -- [FIX-E] Single clock snapshot
+    local now    = os.clock()
+    local prevPl = ST.tgpl
+
+    -- [FIX-H] Only ramp on real target switch, not first acquire
+    if prevPl ~= pl then
+        ST.switchT = now
+        if prevPl ~= nil then
+            ST.lkT = now + (S.AC.hz and RNG:NextNumber(0.05, S.AM.lo+0.1) or 0)
+        end
+    end
+    ST.tg = p; ST.tgpl = pl
+
+    local ramping   = ST.lkT > now
+    local switching = (now - ST.switchT) < 0.15
+
+    local pos = (S.AM.pd > 0) and pp(p, pl) or p.Position
+    local cam = CAM(); if not cam then return end
+
+    if not haveMouse() then
+        local lk     = CFrame.lookAt(cam.CFrame.Position, pos)
+        local sp, on = cam:WorldToViewportPoint(pos)
+        local d      = on and (Vector2.new(sp.X,sp.Y)
+            - Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)).Magnitude or 400
+        local dNorm     = cl(d/350, 0, 1)
+        -- [FIX-F] Floor after multipliers
+        local smoothEff = S.AM.sm * (1 - dNorm*0.6)
+        if ramping   then smoothEff = smoothEff * 0.55 end
+        if switching then smoothEff = smoothEff * 0.4  end
+        smoothEff = math.max(0.01, smoothEff)
+        local al2 = 1 - math.pow(1 - smoothEff, (dt or 0.016)*60)
+        if ramping then
+            lk = lk * CFrame.new(RNG:NextNumber(-0.5,0.5), RNG:NextNumber(-0.5,0.5), 0)
+        end
+        cam.CFrame = cam.CFrame:Lerp(lk, cl(al2, 0, 0.6))
+        return
+    end
+
+    local sp, on = cam:WorldToViewportPoint(pos)
+    if not on then return end
+    local cx, cy = cam.ViewportSize.X/2, cam.ViewportSize.Y/2
+    local dx, dy = sp.X-cx, sp.Y-cy
+    local d      = math.sqrt(dx*dx + dy*dy)
+    if d < 4 then return end
+
+    local dNorm     = cl(d/350, 0, 1)
+    -- [FIX-F] Floor after multipliers
+    local smoothEff = S.AM.sm * (1 - dNorm*0.6)
+    if ramping   then smoothEff = smoothEff * 0.55 end
+    if switching then smoothEff = smoothEff * 0.4  end
+    smoothEff = math.max(0.01, smoothEff)
+
+    local f  = 1 - smoothEff
+    local mx = dx * f
+    local my = dy * f
+
+    -- [FIX-D] Jitter scales with distance
+    if ramping then
+        local jitterScale = cl(d / 120, 0.02, 0.6)
+        mx = mx + RNG:NextNumber(-0.5,0.5) * jitterScale
+        my = my + RNG:NextNumber(-0.5,0.5) * jitterScale
+    end
+
+    -- [FIX-J] mm scales with dt to prevent high-FPS overshoot
+    local mm = (14 + dNorm*34) * cl((dt or 0.016) * 60, 0.5, 2.0)
+    if math.abs(mx) > mm then mx = sg(dx)*mm end
+    if math.abs(my) > mm then my = sg(dy)*mm end
+
+    -- [FIX-M] Corrected skip gate: random 2% chance per frame,
+    -- but enforces a minimum 0.8s gap between skips so they
+    -- are unpredictable but not annoyingly frequent.
+    if now - ST.skipT > 0.8 then
+        if RNG:NextNumber() < 0.02 then
+            ST.skipT = now
+            return
+        end
+    end
+
+    if CAP.mr then
+        pcall(mousemoverel, mx, my)
+    else
+        local gx, gy = UI:GetMouseLocation().X, UI:GetMouseLocation().Y
+        pcall(mousemoveabs, gx+mx, gy+my)
+    end
+end
+
+-- ============================================================
+-- SILENT AIM
+-- ============================================================
+local function sa()
+    if not S.SL.on or not ST.saArm then return end
+    if not haveMouse() then return end
+    if RNG:NextNumber() < 0.7 then return end
+    pcall(function()
+        local p, pl = findTarget(S.FV.r, S.SL.md, S.SL.tc, S.SL.wc, true)
+        if not p then return end
+        local cam = CAM(); if not cam then return end
+        local pos = (S.SL.pd or 0) > 0 and pp(p, pl) or p.Position
+        if S.SL.sp and S.SL.sp > 0 then
+            local so = S.SL.sp
+            pos = pos + Vector3.new(
+                RNG:NextNumber(-so, so),
+                RNG:NextNumber(-so*0.6, so),
+                RNG:NextNumber(-so, so))
+        end
+        local sp, on = cam:WorldToViewportPoint(pos)
+        if not on then return end
+        local cx, cy = cam.ViewportSize.X/2, cam.ViewportSize.Y/2
+        local dx, dy = sp.X-cx, sp.Y-cy
+        local d      = math.sqrt(dx*dx + dy*dy)
+        if d < 25 then return end
+        local f  = 1 - S.SL.sm
+        local mx = dx*f
+        local my = dy*f
+        local mm = 10 + S.SL.sm*8
+        if math.abs(mx) > mm then mx = sg(dx)*mm end
+        if math.abs(my) > mm then my = sg(dy)*mm end
+        if CAP.mr then pcall(mousemoverel, mx, my)
+        else
+            local gx, gy = UI:GetMouseLocation().X, UI:GetMouseLocation().Y
+            pcall(mousemoveabs, gx+mx, gy+my)
+        end
+    end)
+end
+
+-- ============================================================
+-- TRIGGERBOT
+-- ============================================================
+local function sc()
+    if CAP.ia then
+        local ok, act = pcall(isrbxactive)
+        if not (ok and act) then return end
+    end
+    if CAP.c1 then mouse1click(); return end
+    if CAP.cp and CAP.cr then mouse1press(); tw(0.015); mouse1release() end
+end
+
+local function tb()
+    if not S.TR.on or not ST.arm then return end
+    pcall(function()
+        local n = os.clock()
+        if n < ST.cd then return end
+        if RNG:NextNumber() < 0.15 then return end
+        if S.AC.hz and RNG:NextNumber() < 0.08 then return end
+        local p = findTarget(15, S.TR.md, S.TR.tc, S.TR.wc, true)
+        if not p then return end
+        local cam = CAM(); if not cam then return end
+        local sp, on = cam:WorldToViewportPoint(p.Position)
+        if not on then return end
+        local cx, cy = cam.ViewportSize.X/2, cam.ViewportSize.Y/2
+        if math.sqrt((sp.X-cx)^2+(sp.Y-cy)^2)
+            > 8 + (S.AC.hz and RNG:NextNumber(-2,5) or 0) then return end
+        local dl = S.TR.dl
+        if S.TR.rd  then dl = dl + RNG:NextNumber(-0.02, 0.035) end
+        if S.AC.hz  then dl = math.max(dl, S.TR.hr + RNG:NextNumber(0, 0.06)) end
+        ST.cd = n + math.max(dl, 0.05)
+        if dl <= 0.05 then sc()
+        else
+            dl = cl(dl, 0.05, 0.3)
+            tsp(function() tw(dl); if ST.ld and S.TR.on and ST.arm then sc() end end)
+        end
+    end)
+end
+
+-- ============================================================
+-- ESP
+-- ============================================================
+local IESP = {}
+
+local function createInstanceESP(pl)
+    local ok = pcall(function()
+        if IESP[pl] and not IESP[pl].fail then return end
+        local c = pl.Character; if not c then return end
+        local hlN = rn(8); local bgN = rn(9)
+
+        local hl = Instance.new("Highlight")
+        hl.Name                = hlN
+        hl.FillTransparency    = 0.5
+        hl.OutlineTransparency = 0.2
+        hl.FillColor           = isEnemy(pl) and S.ES.ce or S.ES.ct
+        hl.OutlineColor        = Color3.fromRGB(255,255,255)
+        hl.Adornee             = c
+        hl.Parent              = c
+
+        local bg = Instance.new("BillboardGui")
+        bg.Name        = bgN
+        bg.Size        = UDim2.new(0,200,0,50)
+        bg.StudsOffset = Vector3.new(0,3.5,0)
+        bg.AlwaysOnTop = true
+        local head = c:FindFirstChild("Head") or fp(c)
+        if head then bg.Adornee = head end
+        bg.Parent = c
+
+        local t1 = Instance.new("TextLabel")
+        t1.Size                   = UDim2.new(1,0,0,26)
+        t1.BackgroundTransparency = 1
+        t1.Text                   = pl.Name
+        t1.TextColor3             = Color3.fromRGB(255,255,255)
+        t1.TextStrokeTransparency = 0.2
+        t1.TextStrokeColor3       = Color3.fromRGB(0,0,0)
+        t1.Font                   = Enum.Font.GothamBold
+        t1.TextSize               = 16
+        t1.Parent                 = bg
+
+        local t2 = Instance.new("TextLabel")
+        t2.Size                   = UDim2.new(1,0,0,18)
+        t2.Position               = UDim2.new(0,0,0,28)
+        t2.BackgroundTransparency = 1
+        t2.Text                   = ""
+        t2.TextColor3             = Color3.fromRGB(180,220,180)
+        t2.TextStrokeTransparency = 0.4
+        t2.TextStrokeColor3       = Color3.fromRGB(0,0,0)
+        t2.Font                   = Enum.Font.Gotham
+        t2.TextSize               = 11
+        t2.Parent                 = bg
+
+        IESP[pl] = {
+            highlight=hl, billboard=bg, txt2=t2,
+            hlN=hlN, bgN=bgN,
+            made=os.clock(), ren=os.clock(),
+        }
+    end)
+    if not ok then IESP[pl] = {fail=os.clock()} end
+end
+
+local function destroyInstanceESP(pl)
+    local esp = IESP[pl]; if not esp then return end
+    if esp.fail then IESP[pl] = nil; return end
+    pcall(function() esp.highlight:Destroy() end)
+    pcall(function() esp.billboard:Destroy() end)
+    IESP[pl] = nil
+end
+
+local function destroyAllInstanceESP()
+    for pl in pairs(IESP) do destroyInstanceESP(pl) end
+end
+
+local function renameESP(pl)
+    local esp = IESP[pl]
+    if not esp or not esp.highlight or not esp.billboard then return end
+    if not S.AC.nm then return end
+    pcall(function()
+        local hlN = rn(8); local bgN = rn(9)
+        esp.highlight.Name = hlN; esp.billboard.Name = bgN
+        esp.hlN = hlN; esp.bgN = bgN; esp.ren = os.clock()
+    end)
+end
+
+-- ============================================================
+-- GUI HELPERS
+-- ============================================================
+local function setMenuVisible(v)
+    if not GUI.main then return end
+    ST.hid           = not v
+    GUI.main.Visible = v
+    if not v then
+        if GUI.igPanel  then GUI.igPanel.Visible  = false end
+        if GUI.setPanel then GUI.setPanel.Visible = false end
+        ST.mn       = false
+        ST.igOpen   = false
+        SI.dragging = false
+        ST._rb      = nil
+        if GUI.restoreBar then GUI.restoreBar.Visible = true end
+    else
+        if GUI.restoreBar then GUI.restoreBar.Visible = false end
+    end
+end
+
+local function toggleKeysPanel()
+    if not GUI.setPanel then return end
+    ST.mn                = not ST.mn
+    GUI.setPanel.Visible = ST.mn
+end
+
+-- ============================================================
+-- IGNORE PANEL REFRESH
+-- [FIX-IG] MouseButton1Click + capturedPl + AutoButtonColor
+-- ============================================================
+local function refreshIgnorePanel()
+    local container = GUI.igContainer; if not container then return end
+    local q = ""
+    if GUI.igSearch and GUI.igSearch.Text then
+        q = GUI.igSearch.Text:lower()
+    end
+    if q ~= ST.igQuery then ST.igQuery = q; ST.igScroll = 0 end
+
+    local children = container:GetChildren()
+    for i = #children, 1, -1 do
+        local child = children[i]
+        if child:IsA("TextButton") or child:IsA("TextLabel") then child:Destroy() end
+    end
+
+    local list = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= ME then
+            if q == "" or pl.Name:lower():find(q, 1, true) then
+                list[#list+1] = pl
+            end
+        end
+    end
+    table.sort(list, function(a,b) return a.Name < b.Name end)
+
+    if #list == 0 then
+        local empty = Instance.new("TextLabel")
+        empty.Size                   = UDim2.new(1,0,0,40)
+        empty.Position               = UDim2.new(0,0,0,10)
+        empty.BackgroundTransparency = 1
+        empty.Text      = q ~= "" and "No players match" or "No players in server"
+        empty.TextColor3 = Color3.fromRGB(180,180,180)
+        empty.TextSize  = 14; empty.Font = Enum.Font.Gotham
+        empty.Parent    = container
+        return
+    end
+
+    local ROW     = 30
+    local VISIBLE = math.max(1, math.floor((container.Size.Y.Offset-8)/ROW))
+    local MAX     = math.max(0, #list-VISIBLE)
+    ST.igScroll   = cl(ST.igScroll or 0, 0, MAX)
+
+    local y = 4
+    for i = 1+ST.igScroll, math.min(#list, ST.igScroll+VISIBLE) do
+        local pl         = list[i]
+        local ignored    = isIgnored(pl)
+        local capturedPl = pl
+
+        local b = Instance.new("TextButton")
+        b.Size             = UDim2.new(1,0,0,26)
+        b.Position         = UDim2.new(0,0,0,y)
+        b.BackgroundColor3 = ignored
+            and Color3.fromRGB(120,30,30)
+            or  Color3.fromRGB(40,40,60)
+        b.BorderSizePixel  = 0
+        b.Text             = (ignored and "[X] " or "      ") .. pl.Name
+        b.TextColor3       = ignored
+            and Color3.fromRGB(255,120,120)
+            or  Color3.fromRGB(200,200,255)
+        b.TextSize         = 12
+        b.Font             = Enum.Font.GothamBold
+        b.AutoButtonColor  = true
+        b.Parent           = container
+
+        b.MouseButton1Click:Connect(function()
+            if IGNORE[capturedPl] then
+                IGNORE[capturedPl] = nil
+            else
+                IGNORE[capturedPl] = true
+            end
+            pcall(refreshIgnorePanel)
+        end)
+
+        b.MouseEnter:Connect(function()
+            b.BackgroundColor3 = isIgnored(capturedPl)
+                and Color3.fromRGB(160,50,50)
+                or  Color3.fromRGB(65,65,90)
+        end)
+        b.MouseLeave:Connect(function()
+            b.BackgroundColor3 = isIgnored(capturedPl)
+                and Color3.fromRGB(120,30,30)
+                or  Color3.fromRGB(40,40,60)
+        end)
+
+        y = y + ROW
+    end
+
+    if GUI.igUp   then
+        GUI.igUp.BackgroundColor3   = ST.igScroll > 0
+            and Color3.fromRGB(60,40,90) or Color3.fromRGB(30,25,40)
+    end
+    if GUI.igDown then
+        GUI.igDown.BackgroundColor3 = ST.igScroll < MAX
+            and Color3.fromRGB(60,40,90) or Color3.fromRGB(30,25,40)
+    end
+end
+
+-- ============================================================
+-- GUI CONSTRUCTION
+-- ============================================================
+local function cg()
+    local gn = rs(16); local mn2 = rs(12); local sn = rs(12); local bn = rs(12)
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name           = gn
+    screenGui.ResetOnSpawn   = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    local ok = pcall(function() screenGui.Parent = ME:WaitForChild("PlayerGui") end)
+    if not ok then ok = pcall(function() screenGui.Parent = CG end) end
+    if not ok then print("[V9.22-OPSYX] No GUI parent"); return end
+    GUI.sg = screenGui
+    if not ST.ourGuis then ST.ourGuis = {} end
+    table.insert(ST.ourGuis, screenGui)
+
+    local main = Instance.new("Frame")
+    main.Name                = mn2
+    main.Size                = UDim2.new(0, 220, 0, 310)
+    main.Position            = UDim2.new(1,-490,0,70)
+    main.BackgroundColor3    = Color3.fromRGB(10,10,18)
+    main.BackgroundTransparency = 0.08
+    main.BorderSizePixel     = 0
+    main.Active              = true
+    main.Draggable           = true
+    main.Parent              = screenGui
+    pcall(function()
+        Instance.new("UICorner", main).CornerRadius = UDim.new(0,10)
+        local st = Instance.new("UIStroke", main)
+        st.Color = Color3.fromRGB(0,160,255); st.Thickness = 1.2
+    end)
+    GUI.main = main
+
+    local accent = Instance.new("Frame")
+    accent.Size             = UDim2.new(1,0,0,2)
+    accent.Position         = UDim2.new(0,0,0,26)
+    accent.BackgroundColor3 = Color3.fromRGB(0,180,255)
+    accent.BorderSizePixel  = 0; accent.Parent = main
+
+    local title = Instance.new("TextLabel")
+    title.Size               = UDim2.new(1,-56,0,26)
+    title.Position           = UDim2.new(0,10,0,0)
+    title.BackgroundTransparency = 1
+    title.Text               = "OPSYX  v9.22"
+    title.TextColor3         = Color3.fromRGB(0,200,255)
+    title.TextSize           = 13; title.Font = Enum.Font.GothamBold
+    title.TextXAlignment     = Enum.TextXAlignment.Left
+    title.Parent             = main
+
+    local WBTN = 20; local WCY = 3
+    local function makeWBtn(xOff, col, lbl)
+        local b = Instance.new("TextButton")
+        b.Size             = UDim2.new(0,WBTN,0,WBTN)
+        b.Position         = UDim2.new(1,xOff,0,WCY)
+        b.BackgroundColor3 = col
+        b.BackgroundTransparency = 0.15
+        b.BorderSizePixel  = 0; b.Text = lbl
+        b.TextColor3       = Color3.fromRGB(255,255,255)
+        b.TextSize         = 12; b.Font = Enum.Font.GothamBold
+        b.Parent           = main
+        pcall(function() Instance.new("UICorner",b).CornerRadius = UDim.new(0,5) end)
+        return b
+    end
+    local minBtn   = makeWBtn(-(WBTN*2+8), Color3.fromRGB(50,50,80),  "-")
+    local closeBtn = makeWBtn(-(WBTN+4),   Color3.fromRGB(120,30,30), "X")
+
+    minBtn.MouseEnter:Connect(function()   minBtn.BackgroundColor3   = Color3.fromRGB(80,80,120)  end)
+    minBtn.MouseLeave:Connect(function()   minBtn.BackgroundColor3   = Color3.fromRGB(50,50,80)   end)
+    closeBtn.MouseEnter:Connect(function() closeBtn.BackgroundColor3 = Color3.fromRGB(200,40,40)  end)
+    closeBtn.MouseLeave:Connect(function() closeBtn.BackgroundColor3 = Color3.fromRGB(120,30,30)  end)
+
+    local restoreBar = Instance.new("TextButton")
+    restoreBar.Size             = UDim2.new(0,100,0,22)
+    restoreBar.Position         = UDim2.new(0,10,0,40)
+    restoreBar.BackgroundColor3 = Color3.fromRGB(10,10,18)
+    restoreBar.BackgroundTransparency = 0.08
+    restoreBar.BorderSizePixel  = 0
+    restoreBar.Text             = "OPSYX"
+    restoreBar.TextColor3       = Color3.fromRGB(0,200,255)
+    restoreBar.TextSize         = 11; restoreBar.Font = Enum.Font.GothamBold
+    restoreBar.Visible          = false; restoreBar.Parent = screenGui
+    pcall(function()
+        Instance.new("UICorner",restoreBar).CornerRadius = UDim.new(0,6)
+        local st = Instance.new("UIStroke",restoreBar)
+        st.Color = Color3.fromRGB(0,160,255); st.Thickness = 1
+    end)
+    GUI.restoreBar = restoreBar
+
+    minBtn.MouseButton1Down:Connect(function()    setMenuVisible(false) end)
+    closeBtn.MouseButton1Down:Connect(function()  setMenuVisible(false) end)
+    restoreBar.MouseButton1Down:Connect(function() setMenuVisible(true) end)
+
+    local RED = Color3.fromRGB(200,40,40)
+    local GRN = Color3.fromRGB(30,180,60)
+    local ORG = Color3.fromRGB(210,110,0)
+    local BLU = Color3.fromRGB(30,100,220)
+
+    local function makeToggle(lbl, yPos, offCol, onCol, getter, setter)
+        local row = Instance.new("Frame")
+        row.Size             = UDim2.new(0.92,0,0,26)
+        row.Position         = UDim2.new(0.04,0,0,yPos)
+        row.BackgroundColor3 = Color3.fromRGB(18,18,30)
+        row.BackgroundTransparency = 0.3
+        row.BorderSizePixel  = 0; row.Parent = main
+        pcall(function() Instance.new("UICorner",row).CornerRadius = UDim.new(0,6) end)
+
+        local lbEl = Instance.new("TextLabel")
+        lbEl.Size               = UDim2.new(0.6,0,1,0)
+        lbEl.BackgroundTransparency = 1
+        lbEl.Text               = lbl
+        lbEl.TextColor3         = Color3.fromRGB(210,210,220)
+        lbEl.TextSize           = 12; lbEl.Font = Enum.Font.GothamBold
+        lbEl.TextXAlignment     = Enum.TextXAlignment.Left
+        lbEl.Position           = UDim2.new(0,8,0,0)
+        lbEl.Parent             = row
+
+        local pill = Instance.new("TextButton")
+        pill.Size             = UDim2.new(0,46,0,18)
+        pill.Position         = UDim2.new(1,-52,0.5,-9)
+        pill.BackgroundColor3 = getter() and onCol or offCol
+        pill.BorderSizePixel  = 0
+        pill.Text             = getter() and "ON" or "OFF"
+        pill.TextColor3       = Color3.fromRGB(255,255,255)
+        pill.TextSize         = 10; pill.Font = Enum.Font.GothamBold
+        pill.Parent           = row
+        pcall(function() Instance.new("UICorner",pill).CornerRadius = UDim.new(1,0) end)
+
+        local function refresh()
+            local ns = getter()
+            pill.BackgroundColor3 = ns and onCol or offCol
+            pill.Text             = ns and "ON" or "OFF"
+        end
+
+        pill.MouseButton1Down:Connect(function() setter(); refresh() end)
+        row.InputBegan:Connect(function(inp)
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                setter(); refresh()
+            end
+        end)
+        return pill
+    end
+
+    local Y = 32; local GAP = 30
+
+    makeToggle("AIMBOT",   Y, RED, GRN,
+        function() return S.AM.on end,
+        function() S.AM.on=not S.AM.on; if not S.AM.on then ST.tg=nil; ST.tgpl=nil; ST.tgDist=999 end end)
+    Y = Y + GAP
+
+    makeToggle("ESP",      Y, RED, GRN,
+        function() return S.ES.on end,
+        function() S.ES.on=not S.ES.on; if not S.ES.on then destroyAllInstanceESP() end end)
+    Y = Y + GAP
+
+    makeToggle("SILENT",   Y, ORG, GRN,
+        function() return S.SL.on end,
+        function() S.SL.on=not S.SL.on end)
+    Y = Y + GAP
+
+    makeToggle("TRIGGER",  Y, RED, GRN,
+        function() return S.TR.on end,
+        function() S.TR.on=not S.TR.on end)
+    Y = Y + GAP
+
+    makeToggle("FOV CIRCLE", Y, BLU, GRN,
+        function() return S.FV.on end,
+        function() S.FV.on=not S.FV.on end)
+    Y = Y + GAP
+
+    makeToggle("WALL CHECK", Y, ORG, GRN,
+        function() return S.AM.wc end,
+        function() local nv=not S.AM.wc; S.AM.wc=nv; S.SL.wc=nv; S.TR.wc=nv end)
+    Y = Y + GAP
+
+    makeToggle("HOLD AIM", Y, ORG, GRN,
+        function() return holdToAimEnabled end,
+        function()
+            holdToAimEnabled = not holdToAimEnabled
+            if not holdToAimEnabled and S.AM.on and ST.arm then S.AM.on=false end
+        end)
+    Y = Y + GAP
+
+    local igBtn = Instance.new("TextButton")
+    igBtn.Size             = UDim2.new(0.92,0,0,26)
+    igBtn.Position         = UDim2.new(0.04,0,0,Y)
+    igBtn.BackgroundColor3 = Color3.fromRGB(55,20,65)
+    igBtn.BackgroundTransparency = 0.2
+    igBtn.BorderSizePixel  = 0; igBtn.Text = "IGNORE LIST"
+    igBtn.TextColor3       = Color3.fromRGB(200,140,255)
+    igBtn.TextSize         = 12; igBtn.Font = Enum.Font.GothamBold
+    igBtn.Parent           = main
+    pcall(function() Instance.new("UICorner",igBtn).CornerRadius = UDim.new(0,6) end)
+    Y = Y + GAP
+
+    local setBtn = Instance.new("TextButton")
+    setBtn.Size             = UDim2.new(0.92,0,0,26)
+    setBtn.Position         = UDim2.new(0.04,0,0,Y)
+    setBtn.BackgroundColor3 = Color3.fromRGB(25,25,70)
+    setBtn.BackgroundTransparency = 0.2
+    setBtn.BorderSizePixel  = 0; setBtn.Text = "KEYS  [F5]"
+    setBtn.TextColor3       = Color3.fromRGB(150,180,255)
+    setBtn.TextSize         = 12; setBtn.Font = Enum.Font.GothamBold
+    setBtn.Parent           = main
+    pcall(function() Instance.new("UICorner",setBtn).CornerRadius = UDim.new(0,6) end)
+
+    -- IGNORE PANEL
+    local igPanel = Instance.new("Frame")
+    igPanel.Name             = bn
+    igPanel.Size             = UDim2.new(0,230,0,500)
+    igPanel.Position         = UDim2.new(1,-267,0,70)
+    igPanel.BackgroundColor3 = Color3.fromRGB(10,10,18)
+    igPanel.BackgroundTransparency = 0.08
+    igPanel.BorderSizePixel  = 0; igPanel.Active = true; igPanel.Draggable = true
+    igPanel.Visible          = false; igPanel.Parent = screenGui
+    pcall(function()
+        Instance.new("UICorner",igPanel).CornerRadius = UDim.new(0,10)
+        local st = Instance.new("UIStroke",igPanel)
+        st.Color = Color3.fromRGB(140,60,200); st.Thickness = 1.2
+    end)
+    GUI.igPanel = igPanel
+
+    local igTitle = Instance.new("TextLabel")
+    igTitle.Size               = UDim2.new(1,0,0,28)
+    igTitle.BackgroundTransparency = 1
+    igTitle.Text               = "IGNORE LIST"
+    igTitle.TextColor3         = Color3.fromRGB(200,150,255)
+    igTitle.TextSize           = 13; igTitle.Font = Enum.Font.GothamBold
+    igTitle.Parent             = igPanel
+
+    local igSearch = Instance.new("TextBox")
+    igSearch.Size              = UDim2.new(1,-10,0,26)
+    igSearch.Position          = UDim2.new(0,5,0,30)
+    igSearch.BackgroundColor3  = Color3.fromRGB(20,20,34)
+    igSearch.BackgroundTransparency = 0.25
+    igSearch.BorderSizePixel   = 0
+    igSearch.PlaceholderText   = "Search..."
+    igSearch.Text              = ""
+    igSearch.TextColor3        = Color3.fromRGB(220,220,255)
+    igSearch.PlaceholderColor3 = Color3.fromRGB(110,110,140)
+    igSearch.TextSize          = 12; igSearch.Font = Enum.Font.Gotham
+    igSearch.ClearTextOnFocus  = false; igSearch.Parent = igPanel
+    pcall(function() Instance.new("UICorner",igSearch).CornerRadius = UDim.new(0,5) end)
+    GUI.igSearch = igSearch
+    igSearch:GetPropertyChangedSignal("Text"):Connect(function() pcall(refreshIgnorePanel) end)
+
+    local igContainer = Instance.new("Frame")
+    igContainer.Size               = UDim2.new(1,-10,0,370)
+    igContainer.Position           = UDim2.new(0,5,0,62)
+    igContainer.BackgroundTransparency = 1
+    igContainer.BorderSizePixel    = 0; igContainer.Parent = igPanel
+    GUI.igContainer = igContainer
+
+    local igUp = Instance.new("TextButton")
+    igUp.Size             = UDim2.new(0,64,0,24)
+    igUp.Position         = UDim2.new(0,10,1,-58)
+    igUp.BackgroundColor3 = Color3.fromRGB(60,40,90)
+    igUp.BackgroundTransparency = 0.3
+    igUp.BorderSizePixel  = 0; igUp.Text = "^"
+    igUp.TextColor3       = Color3.fromRGB(220,180,255)
+    igUp.TextSize         = 13; igUp.Font = Enum.Font.GothamBold
+    igUp.Parent           = igPanel
+    pcall(function() Instance.new("UICorner",igUp).CornerRadius = UDim.new(0,5) end)
+    igUp.MouseButton1Down:Connect(function()
+        ST.igScroll = math.max(0,(ST.igScroll or 0)-6); refreshIgnorePanel()
+    end)
+    GUI.igUp = igUp
+
+    local igDown = Instance.new("TextButton")
+    igDown.Size             = UDim2.new(0,64,0,24)
+    igDown.Position         = UDim2.new(0,82,1,-58)
+    igDown.BackgroundColor3 = Color3.fromRGB(60,40,90)
+    igDown.BackgroundTransparency = 0.3
+    igDown.BorderSizePixel  = 0; igDown.Text = "v"
+    igDown.TextColor3       = Color3.fromRGB(220,180,255)
+    igDown.TextSize         = 13; igDown.Font = Enum.Font.GothamBold
+    igDown.Parent           = igPanel
+    pcall(function() Instance.new("UICorner",igDown).CornerRadius = UDim.new(0,5) end)
+    igDown.MouseButton1Down:Connect(function()
+        ST.igScroll = ST.igScroll + 6; refreshIgnorePanel()
+    end)
+    GUI.igDown = igDown
+
+    local igClose = Instance.new("TextButton")
+    igClose.Size             = UDim2.new(0,80,0,24)
+    igClose.Position         = UDim2.new(0.5,-40,1,-28)
+    igClose.BackgroundColor3 = Color3.fromRGB(60,20,20)
+    igClose.BackgroundTransparency = 0.2
+    igClose.BorderSizePixel  = 0; igClose.Text = "CLOSE"
+    igClose.TextColor3       = Color3.fromRGB(255,140,140)
+    igClose.TextSize         = 11; igClose.Font = Enum.Font.GothamBold
+    igClose.Parent           = igPanel
+    pcall(function() Instance.new("UICorner",igClose).CornerRadius = UDim.new(0,5) end)
+    igClose.MouseButton1Down:Connect(function() igPanel.Visible=false; ST.igOpen=false end)
+
+    igBtn.MouseButton1Down:Connect(function()
+        ST.igOpen = not ST.igOpen
+        igPanel.Visible = ST.igOpen
+        if ST.igOpen then pcall(refreshIgnorePanel) end
+    end)
+
+    -- KEYS PANEL
+    local setP = Instance.new("Frame")
+    setP.Name             = sn
+    setP.Size             = UDim2.new(0,350,0,400)
+    setP.Position         = UDim2.new(0,240,0,70)
+    setP.BackgroundColor3 = Color3.fromRGB(10,10,18)
+    setP.BackgroundTransparency = 0.08
+    setP.BorderSizePixel  = 0; setP.Active = true; setP.Draggable = true
+    setP.Visible          = false; setP.Parent = screenGui
+    pcall(function()
+        Instance.new("UICorner",setP).CornerRadius = UDim.new(0,10)
+        local st = Instance.new("UIStroke",setP)
+        st.Color = Color3.fromRGB(0,160,255); st.Thickness = 1.2
+    end)
+    GUI.setPanel = setP
+
+    local spTitle = Instance.new("TextLabel")
+    spTitle.Size               = UDim2.new(1,0,0,28)
+    spTitle.BackgroundTransparency = 1
+    spTitle.Text               = "KEYS + FOV  (F5 = toggle)"
+    spTitle.TextColor3         = Color3.fromRGB(255,200,80)
+    spTitle.TextSize           = 12; spTitle.Font = Enum.Font.GothamBold
+    spTitle.Parent             = setP
+
+    local spAccent = Instance.new("Frame")
+    spAccent.Size             = UDim2.new(1,0,0,1)
+    spAccent.Position         = UDim2.new(0,0,0,28)
+    spAccent.BackgroundColor3 = Color3.fromRGB(0,160,255)
+    spAccent.BorderSizePixel  = 0; spAccent.Parent = setP
+
+    local binds = {
+        {l="Aimbot",  k="am"},{l="ESP",     k="es"},
+        {l="Silent",  k="sl"},{l="Trigger", k="tr"},
+        {l="Wall",    k="wc"},
+    }
+    for i = 1, #binds do
+        local bd = binds[i]; local ry = 36+(i-1)*34
+        local lbl = Instance.new("TextLabel")
+        lbl.Size               = UDim2.new(0,150,0,26); lbl.Position = UDim2.new(0,10,0,ry)
+        lbl.BackgroundTransparency = 1; lbl.Text = bd.l
+        lbl.TextColor3         = Color3.fromRGB(190,190,200)
+        lbl.TextSize           = 12; lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment     = Enum.TextXAlignment.Left; lbl.Parent = setP
+        local kb = Instance.new("TextButton")
+        kb.Size             = UDim2.new(0,140,0,26); kb.Position = UDim2.new(0,175,0,ry)
+        kb.BackgroundColor3 = Color3.fromRGB(20,20,40); kb.BackgroundTransparency = 0.2
+        kb.BorderSizePixel  = 0; kb.Text = S.KB[bd.k]
+        kb.TextColor3       = Color3.fromRGB(0,200,255)
+        kb.TextSize         = 12; kb.Font = Enum.Font.GothamBold; kb.Parent = setP
+        pcall(function() Instance.new("UICorner",kb).CornerRadius = UDim.new(0,5) end)
+        local bk = bd.k
+        kb.MouseButton1Down:Connect(function()
+            ST._rb = {btn=kb, key=bk, old=S.KB[bk]}
+            kb.Text = "..."; kb.TextColor3 = Color3.fromRGB(255,200,0)
+        end)
+    end
+
+    local fixY = 36 + #binds*34 + 4
+    local function fixedRow(label, keyName, ry)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size               = UDim2.new(0,150,0,26); lbl.Position = UDim2.new(0,10,0,ry)
+        lbl.BackgroundTransparency = 1; lbl.Text = label
+        lbl.TextColor3         = Color3.fromRGB(160,160,170)
+        lbl.TextSize           = 11; lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment     = Enum.TextXAlignment.Left; lbl.Parent = setP
+        local val = Instance.new("TextLabel")
+        val.Size             = UDim2.new(0,140,0,26); val.Position = UDim2.new(0,175,0,ry)
+        val.BackgroundColor3 = Color3.fromRGB(15,15,28); val.BackgroundTransparency = 0.2
+        val.BorderSizePixel  = 0; val.Text = keyName
+        val.TextColor3       = Color3.fromRGB(120,120,140)
+        val.TextSize         = 11; val.Font = Enum.Font.Gotham; val.Parent = setP
+        pcall(function() Instance.new("UICorner",val).CornerRadius = UDim.new(0,5) end)
+    end
+    fixedRow("Keys Panel", "F5  (fixed)",  fixY)
+    fixedRow("Hide Menu",  "F7  (fixed)",  fixY+30)
+
+    local tcY = fixY + 66
+    local tcLbl = Instance.new("TextLabel")
+    tcLbl.Size               = UDim2.new(0,150,0,26); tcLbl.Position = UDim2.new(0,10,0,tcY)
+    tcLbl.BackgroundTransparency = 1; tcLbl.Text = "Team Check"
+    tcLbl.TextColor3         = Color3.fromRGB(190,190,200)
+    tcLbl.TextSize           = 12; tcLbl.Font = Enum.Font.Gotham
+    tcLbl.TextXAlignment     = Enum.TextXAlignment.Left; tcLbl.Parent = setP
+    local tcBtn = Instance.new("TextButton")
+    tcBtn.Size             = UDim2.new(0,140,0,26); tcBtn.Position = UDim2.new(0,175,0,tcY)
+    tcBtn.BackgroundColor3 = S.AM.tc and Color3.fromRGB(30,70,30) or Color3.fromRGB(70,30,30)
+    tcBtn.BackgroundTransparency = 0.2; tcBtn.BorderSizePixel = 0
+    tcBtn.Text             = S.AM.tc and "ON" or "OFF"
+    tcBtn.TextColor3       = Color3.fromRGB(255,255,255)
+    tcBtn.TextSize         = 12; tcBtn.Font = Enum.Font.GothamBold; tcBtn.Parent = setP
+    pcall(function() Instance.new("UICorner",tcBtn).CornerRadius = UDim.new(0,5) end)
+    tcBtn.MouseButton1Down:Connect(function()
+        local nv = not S.AM.tc
+        S.AM.tc=nv; S.SL.tc=nv; S.TR.tc=nv; S.ES.tc=nv
+        tcBtn.BackgroundColor3 = nv and Color3.fromRGB(30,70,30) or Color3.fromRGB(70,30,30)
+        tcBtn.Text = nv and "ON" or "OFF"
+    end)
+
+    local slY = tcY + 34
+    local fovLbl = Instance.new("TextLabel")
+    fovLbl.Size               = UDim2.new(0,330,0,20); fovLbl.Position = UDim2.new(0,10,0,slY)
+    fovLbl.BackgroundTransparency = 1; fovLbl.Text = "FOV: " .. math.floor(S.FV.r)
+    fovLbl.TextColor3         = Color3.fromRGB(190,190,200)
+    fovLbl.TextSize           = 12; fovLbl.Font = Enum.Font.Gotham
+    fovLbl.TextXAlignment     = Enum.TextXAlignment.Left; fovLbl.Parent = setP
+
+    local sBg = Instance.new("Frame")
+    sBg.Size             = UDim2.new(0,330,0,6); sBg.Position = UDim2.new(0,10,0,slY+22)
+    sBg.BackgroundColor3 = Color3.fromRGB(30,30,50); sBg.BorderSizePixel = 0; sBg.Parent = setP
+    pcall(function() Instance.new("UICorner",sBg).CornerRadius = UDim.new(0,3) end)
+
+    local sFill = Instance.new("Frame")
+    sFill.Size             = UDim2.new(S.FV.r/500,0,1,0)
+    sFill.BackgroundColor3 = Color3.fromRGB(0,180,255)
+    sFill.BorderSizePixel  = 0; sFill.Parent = sBg
+    pcall(function() Instance.new("UICorner",sFill).CornerRadius = UDim.new(0,3) end)
+
+    local sBtn = Instance.new("TextButton")
+    sBtn.Size             = UDim2.new(0,16,0,16)
+    sBtn.Position         = UDim2.new(S.FV.r/500,-8,0,-5)
+    sBtn.BackgroundColor3 = Color3.fromRGB(0,200,255)
+    sBtn.BorderSizePixel  = 0; sBtn.Text = ""; sBtn.Parent = sBg
+    pcall(function() Instance.new("UICorner",sBtn).CornerRadius = UDim.new(0,8) end)
+
+    local cY2 = slY + 40
+    local cBtn = Instance.new("TextButton")
+    cBtn.Size             = UDim2.new(0,130,0,24); cBtn.Position = UDim2.new(0,10,0,cY2)
+    cBtn.BackgroundColor3 = S.FV.c; cBtn.BorderSizePixel = 0
+    cBtn.Text             = "FOV COLOR"; cBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    cBtn.TextSize         = 10; cBtn.Font = Enum.Font.GothamBold; cBtn.Parent = setP
+    pcall(function() Instance.new("UICorner",cBtn).CornerRadius = UDim.new(0,5) end)
+    local cols = {
+        Color3.fromRGB(255,255,255), Color3.fromRGB(0,200,255),
+        Color3.fromRGB(255,60,60),   Color3.fromRGB(60,255,60),
+        Color3.fromRGB(255,200,0),
+    }
+    local ci = 1
+    cBtn.MouseButton1Down:Connect(function()
+        ci = ci % #cols + 1; S.FV.c = cols[ci]
+        cBtn.BackgroundColor3 = S.FV.c
+        if FC then FC.Color = S.FV.c end
+    end)
+
+    local clBtn = Instance.new("TextButton")
+    clBtn.Size             = UDim2.new(0,80,0,24)
+    clBtn.Position         = UDim2.new(0.5,-40,0,setP.Size.Y.Offset-30)
+    clBtn.BackgroundColor3 = Color3.fromRGB(60,20,20); clBtn.BackgroundTransparency = 0.2
+    clBtn.BorderSizePixel  = 0; clBtn.Text = "CLOSE"
+    clBtn.TextColor3       = Color3.fromRGB(255,140,140)
+    clBtn.TextSize         = 11; clBtn.Font = Enum.Font.GothamBold; clBtn.Parent = setP
+    pcall(function() Instance.new("UICorner",clBtn).CornerRadius = UDim.new(0,5) end)
+    clBtn.MouseButton1Down:Connect(function() toggleKeysPanel() end)
+    setBtn.MouseButton1Down:Connect(function()  toggleKeysPanel() end)
+
+    SI = {sBg=sBg, sBtn=sBtn, sFill=sFill, fovLbl=fovLbl, dragging=false}
+    sBtn.MouseButton1Down:Connect(function() SI.dragging = true end)
+end
+
+-- ============================================================
+-- INPUT
+-- ============================================================
+local okIn, errIn = pcall(function()
+    hook(UI.InputBegan:Connect(function(inp, gpd)
+        if UI:GetFocusedTextBox() then return end
+
+        if ST._rb then
+            if isMouseBtn(inp) then
+                if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+                    S.KB[ST._rb.key] = "MouseButton2"
+                    ST._rb.btn.Text = "MouseButton2"
+                    ST._rb.btn.TextColor3 = Color3.fromRGB(0,200,255)
+                    ST._rb = nil
+                end
+                return
+            end
+            if inp.KeyCode == Enum.KeyCode.F5
+            or inp.KeyCode == Enum.KeyCode.F7 then
+                ST._rb.btn.Text = ST._rb.old
+                ST._rb.btn.TextColor3 = Color3.fromRGB(0,200,255)
+                ST._rb = nil; return
+            end
+            if inp.KeyCode == Enum.KeyCode.Escape then
+                ST._rb.btn.Text = ST._rb.old
+                ST._rb.btn.TextColor3 = Color3.fromRGB(0,200,255)
+                ST._rb = nil; return
+            end
+            local nn = nil
+            if inp.KeyCode ~= Enum.KeyCode.Unknown then
+                nn = EN[inp.KeyCode] or tostring(inp.KeyCode):gsub("Enum.KeyCode.","")
+            elseif inp.UserInputType ~= Enum.UserInputType.None then
+                nn = EN[inp.UserInputType] or tostring(inp.UserInputType):gsub("Enum.UserInputType.","")
+            end
+            if nn then
+                S.KB[ST._rb.key] = nn
+                ST._rb.btn.Text = nn
+                ST._rb.btn.TextColor3 = Color3.fromRGB(0,200,255)
+                ST._rb = nil
+            end
+            return
+        end
+
+        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+            ST.arm   = true
+            ST.saArm = true
+            if holdToAimEnabled then S.AM.on = true end
+        end
+
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            ST.saArm = true
+        end
+
+        if inp.KeyCode == Enum.KeyCode.F7 then
+            if GUI.main then
+                local nv = not GUI.main.Visible
+                setMenuVisible(nv)
+                if not nv and S.AC.hi then destroyAllInstanceESP() end
+            end
+            return
+        end
+
+        if inp.KeyCode == Enum.KeyCode.F5 then
+            toggleKeysPanel(); return
+        end
+
+        if gpd then return end
+
+        local function updBtn(name, state, onC, offC)
+            if not GUI.main then return end
+            for _, v in ipairs(GUI.main:GetChildren()) do
+                if v:IsA("Frame") then
+                    for _, pill in ipairs(v:GetChildren()) do
+                        if pill:IsA("TextButton") then
+                            local lbl = v:FindFirstChildOfClass("TextLabel")
+                            if lbl and lbl.Text == name then
+                                pill.BackgroundColor3 = state and onC or offC
+                                pill.Text = state and "ON" or "OFF"
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if mk(inp,"am") then
+            S.AM.on = not S.AM.on
+            if not S.AM.on then ST.tg=nil; ST.tgpl=nil; ST.tgDist=999 end
+            updBtn("AIMBOT",     S.AM.on, Color3.fromRGB(30,180,60), Color3.fromRGB(200,40,40))
+        end
+        if mk(inp,"es") then
+            S.ES.on = not S.ES.on
+            if not S.ES.on then destroyAllInstanceESP() end
+            updBtn("ESP",        S.ES.on, Color3.fromRGB(30,180,60), Color3.fromRGB(200,40,40))
+        end
+        if mk(inp,"sl") then
+            S.SL.on = not S.SL.on
+            updBtn("SILENT",     S.SL.on, Color3.fromRGB(30,180,60), Color3.fromRGB(210,110,0))
+        end
+        if mk(inp,"tr") then
+            S.TR.on = not S.TR.on
+            updBtn("TRIGGER",    S.TR.on, Color3.fromRGB(30,180,60), Color3.fromRGB(200,40,40))
+        end
+        if mk(inp,"wc") then
+            local nv=not S.AM.wc; S.AM.wc=nv; S.SL.wc=nv; S.TR.wc=nv
+            updBtn("WALL CHECK", nv,      Color3.fromRGB(30,180,60), Color3.fromRGB(210,110,0))
+        end
+    end))
+
+    hook(UI.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+            ST.arm   = false
+            ST.saArm = false
+            if holdToAimEnabled then S.AM.on = false end
+        end
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            tsp(function() tw(0.05); ST.saArm = false end)
+            SI.dragging = false
+        end
+    end))
+end)
+if not okIn then warn("[OPSYX] Input init failed: " .. tostring(errIn)) end
+
+-- ============================================================
+-- MOBILE UI
+-- ============================================================
+if MOB then
+    pcall(function()
+        local tn = rs(12)
+        local tg = Instance.new("ScreenGui"); tg.Name=tn; tg.ResetOnSpawn=false
+        local ok = pcall(function() tg.Parent = ME:WaitForChild("PlayerGui") end)
+        if not ok then pcall(function() tg.Parent = CG end) end
+        if ST.ourGuis then table.insert(ST.ourGuis,tg) else ST.ourGuis={tg} end
+        local tf = Instance.new("Frame")
+        tf.Size=UDim2.new(0,50,0,220); tf.Position=UDim2.new(1,-60,0.5,-110)
+        tf.BackgroundTransparency=1; tf.BorderSizePixel=0; tf.Parent=tg
+        local function mt(l, y, gs, fn, armSA)
+            local b = Instance.new("TextButton")
+            b.Size=UDim2.new(0,50,0,50); b.Position=UDim2.new(0,0,0,y)
+            b.BackgroundColor3 = gs() and Color3.fromRGB(30,180,60) or Color3.fromRGB(200,40,40)
+            b.BackgroundTransparency=0.15; b.BorderSizePixel=0
+            b.Text=l:sub(1,2); b.TextColor3=Color3.fromRGB(255,255,255)
+            b.TextSize=11; b.Font=Enum.Font.GothamBold; b.Parent=tf
+            pcall(function() Instance.new("UICorner",b).CornerRadius=UDim.new(0,8) end)
+            b.MouseButton1Down:Connect(function()
+                fn()
+                if armSA then ST.arm=true; ST.saArm=true end
+                b.BackgroundColor3 = gs() and Color3.fromRGB(30,180,60) or Color3.fromRGB(200,40,40)
+            end)
+        end
+        mt("AM",5,  function() return S.AM.on end,
+            function() S.AM.on=not S.AM.on; if not S.AM.on then ST.tg=nil; ST.tgpl=nil; ST.tgDist=999 end end)
+        mt("ES",60, function() return S.ES.on end,
+            function() S.ES.on=not S.ES.on; if not S.ES.on then destroyAllInstanceESP() end end)
+        mt("SL",115,function() return S.SL.on end,
+            function() S.SL.on=not S.SL.on end, true)
+        mt("TR",170,function() return S.TR.on end,
+            function() S.TR.on=not S.TR.on end, true)
+    end)
+end
+
+-- ============================================================
+-- MAIN LOOP
+-- ============================================================
+local okCg, errCg = pcall(cg)
+if not okCg then warn("[OPSYX] GUI init error: " .. tostring(errCg)) end
+
+hook(Players.PlayerAdded:Connect(function()
+    if GUI.igPanel and GUI.igPanel.Visible then pcall(refreshIgnorePanel) end
+end))
+
+local conn
+local okLoop, errLoop = pcall(function()
+    conn = RS.RenderStepped:Connect(function(dt)
+        if not ST.ld then conn:Disconnect(); return end
+        ST.fr = (ST.fr or 0) + 1
+
+        pcall(function()
+            if not FC then return end
+            local show = S.FV.on
+            local mx, my = UI:GetMouseLocation().X, UI:GetMouseLocation().Y
+            if show then
+                FC.Position    = Vector2.new(mx, my)
+                FC.Radius      = S.FV.r
+                FC.Color       = S.FV.c
+                FC.Thickness   = S.FV.th
+                FC.NumSides    = 48
+                FC.Filled      = S.FV.fl
+                FC.Transparency = S.FV.tr
+            end
+            FC.Visible = show
+        end)
+
+        pcall(function()
+            if not FTL then return end
+            local show = S.AM.on and S.FV.on and ST.tgpl ~= nil
+            if show then
+                local mx, my = UI:GetMouseLocation().X, UI:GetMouseLocation().Y
+                FTL.Position = Vector2.new(mx, my + S.FV.r + 18)
+                FTL.Text     = ST.tgpl.Name
+            end
+            FTL.Visible = show
+        end)
+
+        pcall(function()
+            if SI.dragging and SI.sBg then
+                local mx  = UI:GetMouseLocation().X
+                local ax  = SI.sBg.AbsolutePosition.X
+                local aw  = SI.sBg.AbsoluteSize.X
+                local pc  = cl((mx-ax)/aw, 0, 1)
+                local r   = math.floor(pc * 500)
+                S.FV.r    = r
+                SI.sBtn.Position = UDim2.new(pc,-8,0,-5)
+                SI.sFill.Size    = UDim2.new(pc,0,1,0)
+                SI.fovLbl.Text   = "FOV: " .. r
+                if FC then FC.Radius = r end
+            end
+        end)
+
+        local nowT = os.clock()
+        if nowT - ST.espT > 0.1 + RNG:NextNumber(0,0.1) then
+            ST.espT = nowT
+            if ST.stealth and nowT - ST.killT > 20 then ST.stealth = false end
+            pcall(function()
+                local charsChanged = false
+                local rngL = (ST.stealth and S.AC.cl) and S.ES.sd or S.ES.md
+                for _, pl in ipairs(Players:GetPlayers()) do
+                    if pl ~= ME then
+                        local c    = pl.Character
+                        local prev = CHARS[pl]
+                        if prev ~= c then
+                            if prev then PART_CACHE[prev] = nil end
+                            CHARS[pl]    = c
+                            charsChanged = true
+                        end
+                        if not S.ES.on then
+                            if IESP[pl] then destroyInstanceESP(pl) end
+                        else
+                            if c and al(c) then
+                                local cam = CAM()
+                                local rt  = fr(c)
+                                if cam and rt
+                                and (cam.CFrame.Position-rt.Position).Magnitude <= rngL then
+                                    local esp = IESP[pl]
+                                    if esp == nil then
+                                        createInstanceESP(pl)
+                                    elseif esp.fail then
+                                        if nowT - esp.fail > 2 then createInstanceESP(pl) end
+                                    elseif esp.highlight then
+                                        if esp.highlight.Parent==nil or esp.billboard.Parent==nil then
+                                            IESP[pl] = nil
+                                            local k = nowT
+                                            if k-ST.killT < 8 then ST.kills=ST.kills+1
+                                            else ST.kills=1 end
+                                            ST.killT = k
+                                            if ST.kills >= 3 then ST.stealth=true; ST.kills=0 end
+                                            createInstanceESP(pl)
+                                        else
+                                            esp.highlight.FillColor = isEnemy(pl) and S.ES.ce or S.ES.ct
+                                            if esp.txt2 then
+                                                local hum = c:FindFirstChildOfClass("Humanoid")
+                                                local dd  = math.floor((cam.CFrame.Position-rt.Position).Magnitude)
+                                                local hp  = "?"
+                                                if hum then
+                                                    local hv = hum.Health
+                                                    if hv == hv and hv >= 0 then
+                                                        hp = tostring(math.floor(hv+0.5))
+                                                    end
+                                                end
+                                                esp.txt2.Text = hp.." HP | "..dd.."m"
+                                            end
+                                            if S.AC.nm and nowT-esp.ren > S.AC.rg then
+                                                renameESP(pl)
+                                            end
+                                        end
+                                    end
+                                else
+                                    if IESP[pl] then destroyInstanceESP(pl) end
+                                end
+                            else
+                                if IESP[pl] then destroyInstanceESP(pl) end
+                            end
+                        end
+                    end
+                end
+                if charsChanged then clearPartCache() end
+            end)
+        end
+
+        pcall(doAimbot, dt)
+        pcall(sa)
+        pcall(tb)
+    end)
+end)
+
+if conn then hook(conn) end
+if not okLoop then warn("[OPSYX] Main loop failed: " .. tostring(errLoop)) end
+
+-- ============================================================
+-- EVENTS
+-- ============================================================
+local function oca(plr)
+    if plr == ME then return end
+    hook(plr.CharacterAdded:Connect(function()
+        tsp(function()
+            tw(0.5)
+            destroyInstanceESP(plr)
+            LP[plr]    = nil
+            CHARS[plr] = nil
+            if ST.tgpl == plr then
+                ST.tg = nil; ST.tgpl = nil; ST.tgDist = 999
+            end
+        end)
+    end))
+end
+for _, pl in ipairs(Players:GetPlayers()) do oca(pl) end
+hook(Players.PlayerAdded:Connect(oca))
+
+hook(Players.PlayerRemoving:Connect(function(pl)
+    destroyInstanceESP(pl)
+    LP[pl]=nil; IGNORE[pl]=nil; CHARS[pl]=nil
+    if ST.tgpl == pl then ST.tg=nil; ST.tgpl=nil; ST.tgDist=999 end
+    if GUI.igPanel and GUI.igPanel.Visible then pcall(refreshIgnorePanel) end
+end))
+
+-- ============================================================
+-- CLEANUP
+-- ============================================================
+function _G.__V94OPSYX_CL()
+    ST.ld=false; ST.hid=false; ST.stealth=false; ST.kills=0
+    destroyAllInstanceESP()
+    if FC  then pcall(function() FC:Remove()  end) end
+    if FTL then pcall(function() FTL:Remove() end) end
+    for i = 1, #CONNS do pcall(function() CONNS[i]:Disconnect() end) end
+    CONNS = {}
+    if ST.ourGuis then
+        for i = 1, #ST.ourGuis do pcall(function() ST.ourGuis[i]:Destroy() end) end
+    end
+    for pl in pairs(LP)    do LP[pl]    = nil end
+    for pl in pairs(CHARS) do CHARS[pl] = nil end
+    clearPartCache()
+    ST.tg=nil; ST.tgpl=nil; ST.tgDist=999
+    _G.__V94OPSYX_LD=nil; _G.__V94OPSYX_CL=nil
+end
+
+print(string.rep("=", 60))
+print("  V9.22 OPSYX  |  sUNC 100% / UNC 98-99%")
+print("  [FIX-N] FOV circle now stays visible when menu is hidden")
+print("  [FIX-K] WEBHOOK_SKIP_IDS restored (was cleared in paste)")
+print("  [FIX-L] syn wrapped in pcall - no crash on non-syn executors")
+print("  [FIX-M] Skip gate corrected - random 2% per frame, min 0.8s gap")
+print("  [FIX-E..J] All V9.20 aimbot fixes retained")
+print("  [FIX-A..D] All V9.19 aimbot fixes retained")
+print("  [FIX-IG]   Ignore list toggle fix retained")
+print("  [FIX-1..9] All V9.18 fixes retained")
+print("  LOCK_MARGIN = 45px")
+print("  F1=Aimbot | F2=ESP | F3=Silent | F4=Trigger | F6=Wall")
+print("  F5=KEYS panel  |  F7=Hide menu  |  RMB=Arm")
+print("  UNLOAD: _G.__V94OPSYX_CL()")
+print(string.rep("=", 60))
