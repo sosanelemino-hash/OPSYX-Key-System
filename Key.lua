@@ -32,7 +32,7 @@ local Config = {
     ShowInstagram   = false,
     InstagramURL    = "https://www.instagram.com/oyb0i/",
     
-    ShowYoutube     = false,
+    ShowYoutube     = true,
     YoutubeURL      = "https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ",
 
     -- [5] File System
